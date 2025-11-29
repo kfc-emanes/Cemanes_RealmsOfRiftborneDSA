@@ -1,3 +1,3 @@
 Realms Of Riftborne
 
-"In a world called Inamorta, stickmen this, stickmen that, they fight, they die, GG.
+"We don't have lore, get over it"
