@@ -60,21 +60,22 @@ public class HPBar extends JPanel{
     g2.setColor(Color.BLACK);
     g2.fillRoundRect(2, 2, width - 4, height - 4, 8, 8);
 
-    //HP color
-    // if(hpPercent > 0.6) {
-    //   g2.setColor(new Color(0, 200, 0));
-    // } else if(hpPercent > 0.3) {
-    //   g2.setColor(new Color(255, 180, 0));
-    // } else {
-    //   g2.setColor(new Color(220, 0, 0));
-    // }
+    //HP color, omit for white HP
+    if(hpPercent > 0.6) {
+      g2.setColor(new Color(0, 200, 0));
+    } else if(hpPercent > 0.3) {
+      g2.setColor(new Color(255, 180, 0));
+    } else {
+      g2.setColor(new Color(220, 0, 0));
+    }
 
-    g2.setColor(Color.WHITE);
+    //Omit for colored vers V
+    // g2.setColor(Color.WHITE);
     g2.fillRoundRect(2, 2, filledWidth, height - 4, 8, 8);
 
     //highlight
-    // g2.setColor(new Color(255, 255, 255, 80));
-    g2.setColor(Color.WHITE);
+    g2.setColor(new Color(255, 255, 255, 80));
+    // g2.setColor(Color.WHITE); //Omit if Colored ganahan
     g2.fillRoundRect(2, 2, filledWidth, (height - 4) / 2, 8, 8);
 
     //Outline

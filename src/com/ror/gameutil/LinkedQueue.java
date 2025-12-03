@@ -1,7 +1,7 @@
 package com.ror.gameutil;
 
 //Queue implementation with generics for type class safety
-public class Queue<A> {
+public class LinkedQueue<A> {
   private static class Node<A> {
 
     A value;

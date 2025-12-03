@@ -1,40 +1,25 @@
 package com.ror.gameengine;
 
 import com.ror.gamemodel.*;
+import com.ror.gameutil.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-import javax.swing.plaf.basic.BasicScrollBarUI;
+
 
 
 public class BattlePanel extends JPanel {
 
-    private static Font pixelFont;
-
-    static {
-        try {
-            pixelFont = Font.createFont(
-                Font.TRUETYPE_FONT, 
-                BattlePanel.class.getResourceAsStream(
-                    "/com/ror/gamemodel/assets/fonts/bytebounce.medium.ttf"
-                    )
-                ).deriveFont(18f);
-            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-            ge.registerFont(pixelFont);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-
-
-
     private GameFrame parent;
-    private JPanel exitOverlay, glass;
+    private JPanel exitOverlay, storyOverlay, tutorialOverlay, glass;
     private JScrollPane logScroll;
     private JLayeredPane layeredPane;
     private JButton backButton;
@@ -42,6 +27,7 @@ public class BattlePanel extends JPanel {
     private JButton skillBtn1, skillBtn2, skillBtn3;
     private JLabel playerHPLabel, enemyHPLabel, playerNameLabel, enemyNameLabel;
     private JLabel playerLevelLabel;
+    private JLabel storyText, storyContinue, tutorialText, tutorialContinue;
     private int healAmount;
 
     private Entity player;
@@ -57,12 +43,15 @@ public class BattlePanel extends JPanel {
     private int lastDamageTakenByPlayer = 0;
     private String mode = "Tutorial";
     private WorldManager worldManager = new WorldManager();
+    private boolean storyActive = false, tutorialActive = false;
+    private LinkedQueue<String> storyQueue = new LinkedQueue<>();
+    private LinkedQueue<String> tutorialQueue = new LinkedQueue<>();
 
     private HPBar playerHPBar;
     private HPBar enemyHPBar;
     
-
     public BattlePanel(GameFrame parent) {
+
         this.parent = parent;
         setLayout(new BorderLayout());
         //createExitOverlay();
@@ -76,30 +65,27 @@ public class BattlePanel extends JPanel {
         //LEFT GAME TITLE
         JLabel titleLabel = new JLabel("Realms of Riftborne", SwingConstants.LEFT);
         titleLabel.setForeground(Color.WHITE);
-        titleLabel.setFont(pixelFont.deriveFont(16f));
+        titleLabel.setFont(GameFonts.pixelFont.deriveFont(16f));
         topContainer.add(titleLabel, BorderLayout.WEST);
 
         JPanel cornerIcons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         cornerIcons.setBackground(Color.BLACK);
 
-        JButton saveIcon = new JButton("\uD83D\uDCBE");
-        JButton menuIcon = new JButton("☰");
+        JButton menuIcon = new JButton("=");
 
-        styleIconButton(saveIcon);
-        styleIconButton(menuIcon);
+        UIUtils.styleIconButton(menuIcon);
 
-        cornerIcons.add(saveIcon);
         cornerIcons.add(menuIcon);
         topContainer.add(cornerIcons, BorderLayout.EAST);
 
         menuIcon.addActionListener(e -> showExitOverlay());
 
-        // Enemy frame
+        // Eemy frame
         JPanel enemyOuterFrame = new JPanel(new BorderLayout());
         enemyOuterFrame.setBackground(Color.BLACK);
         enemyOuterFrame.setBorder(new EmptyBorder(10, 200, 10, 200));
 
-        // Enemy frame uses the SAME layout style as player frame
+        
         JPanel enemyFrame = new JPanel(new BorderLayout(10, 0));
         enemyFrame.setBackground(Color.BLACK);
         enemyFrame.setBorder(BorderFactory.createCompoundBorder(
@@ -110,7 +96,7 @@ public class BattlePanel extends JPanel {
         // LEFT — Enemy Name
         enemyNameLabel = new JLabel("Enemy", SwingConstants.CENTER);
         enemyNameLabel.setForeground(Color.WHITE);
-        enemyNameLabel.setFont(pixelFont.deriveFont(20f));
+        enemyNameLabel.setFont(GameFonts.pixelFont.deriveFont(20f));
         enemyNameLabel.setBorder(new EmptyBorder(0, 6, 0, 6));
         enemyFrame.add(enemyNameLabel, BorderLayout.WEST);
 
@@ -127,7 +113,7 @@ public class BattlePanel extends JPanel {
         // RIGHT — HP LABEL
         enemyHPLabel = new JLabel("HP: --/--", SwingConstants.RIGHT);
         enemyHPLabel.setForeground(Color.WHITE);
-        enemyHPLabel.setFont(pixelFont.deriveFont(18f));
+        enemyHPLabel.setFont(GameFonts.pixelFont.deriveFont(18f));
 
         JPanel enemyRight = new JPanel(new BorderLayout());
         enemyRight.setBackground(Color.BLACK);
@@ -142,9 +128,12 @@ public class BattlePanel extends JPanel {
         // CENTER — BATTLE LOG
         battleLog = new JTextArea();
         battleLog.setEditable(false);
-        battleLog.setBackground(Color.BLACK);
+        battleLog.setBackground(new Color(0, 0, 0, 0)); // transparent
         battleLog.setForeground(Color.WHITE);
-        battleLog.setFont(pixelFont.deriveFont(18f));
+        battleLog.setLineWrap(true);
+        battleLog.setWrapStyleWord(true);
+        battleLog.setFont(GameFonts.pixelFont.deriveFont(18f));
+        battleLog.setOpaque(false); // ← important
 
         logScroll = new JScrollPane(battleLog);
         logScroll.setBorder(BorderFactory.createCompoundBorder(
@@ -152,13 +141,13 @@ public class BattlePanel extends JPanel {
             new EmptyBorder(12, 12, 12, 12)
         ));
 
-        logScroll.getViewport().setBackground(Color.BLACK);
-
         logScroll.setOpaque(false);
-        logScroll.getViewport().setOpaque(true);
+        logScroll.getViewport().setOpaque(false); // ← FIX
+        logScroll.getViewport().setBackground(new Color(0, 0, 0, 0));
 
         logScroll.getVerticalScrollBar().setUI(new WhiteScrollBarUI());
         logScroll.getHorizontalScrollBar().setUI(new WhiteScrollBarUI());
+
         
         // BOTTOM — PLAYER FRAME + SKILLS
         JPanel bottomContainer = new JPanel(new BorderLayout());
@@ -174,13 +163,13 @@ public class BattlePanel extends JPanel {
 
         playerNameLabel = new JLabel("Player", SwingConstants.CENTER);
         playerNameLabel.setForeground(Color.WHITE);
-        playerNameLabel.setFont(pixelFont.deriveFont(20f));
+        playerNameLabel.setFont(GameFonts.pixelFont.deriveFont(20f));
         playerNameLabel.setBorder(new EmptyBorder(0, 6, 0, 6));
 
         playerLevelLabel = new JLabel("Lv: 1", SwingConstants.LEFT);
         playerLevelLabel.setBorder(new EmptyBorder(0, 0, 0, 12));
         playerLevelLabel.setForeground(Color.WHITE);
-        playerLevelLabel.setFont(pixelFont.deriveFont(16f));
+        playerLevelLabel.setFont(GameFonts.pixelFont.deriveFont(16f));
 
         playerHPBar = new HPBar(1, 1);
         playerHPBar.setPreferredSize(new Dimension(300, 18));
@@ -188,7 +177,7 @@ public class BattlePanel extends JPanel {
         playerHPLabel = new JLabel("HP: --/--", SwingConstants.RIGHT);
         playerHPLabel.setBorder(new EmptyBorder(0, 12, 0, 6));
         playerHPLabel.setForeground(Color.WHITE);
-        playerHPLabel.setFont(pixelFont.deriveFont(16f));
+        playerHPLabel.setFont(GameFonts.pixelFont.deriveFont(16f));
 
         JPanel playerCenter = new JPanel(new BorderLayout(6, 0));
         playerCenter.setBackground(Color.BLACK);
@@ -212,15 +201,15 @@ public class BattlePanel extends JPanel {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(18, 18, 0, 18);
 
-        Font btnFont = pixelFont.deriveFont(18f);
+        Font btnFont = GameFonts.pixelFont.deriveFont(18f);
 
         skillBtn1 = new JButton("Skill 1");
         skillBtn2 = new JButton("Skill 2");
         skillBtn3 = new JButton("Skill 3");
 
-        styleLargeButton(skillBtn1, btnFont);
-        styleLargeButton(skillBtn2, btnFont);
-        styleLargeButton(skillBtn3, btnFont);
+        UIUtils.styleLargeButton(skillBtn1, btnFont);
+        UIUtils.styleLargeButton(skillBtn2, btnFont);
+        UIUtils.styleLargeButton(skillBtn3, btnFont);
 
         gbc.gridx = 0; bottomButtons.add(skillBtn1, gbc);
         gbc.gridx = 1; bottomButtons.add(skillBtn2, gbc);
@@ -233,27 +222,7 @@ public class BattlePanel extends JPanel {
         add(bottomContainer, BorderLayout.SOUTH);
     }
     
-    //Helper funcs for icon styling
-    private void styleIconButton(JButton b) {
-        b.setFont(pixelFont.deriveFont(16f));
-        b.setForeground(Color.WHITE);
-        b.setBackground(Color.BLACK);
-        b.setFocusPainted(false);
-        b.setBorder(new LineBorder(Color.WHITE, 2));
-        b.setPreferredSize(new Dimension(36, 36));
-    }
 
-    private void styleLargeButton(JButton b, Font font) {
-        b.setFont(font);
-        b.setForeground(Color.WHITE);
-        b.setBackground(Color.BLACK);
-        b.setFocusPainted(false);
-        b.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(Color.WHITE, 2),
-            new EmptyBorder(12, 28, 12, 28)
-        ));
-        b.setPreferredSize(new Dimension(220, 64));
-    }
 
     //Game logic - shouldve been labeled from start(driving me nuts)
     public void startBattle(Entity chosenPlayer) {
@@ -282,6 +251,7 @@ public class BattlePanel extends JPanel {
         for (Skill sk : skills) sk.resetCooldown();
         skillBtn1.setText(skills[0].getName());
         skillBtn2.setText(skills[1].getName());
+        
         skillBtn3.setText(skills[2].getName());
 
         skillBtn1.setEnabled(true);
@@ -295,31 +265,29 @@ public class BattlePanel extends JPanel {
         skillBtn3.addActionListener(e -> playerUseSkill(2));
 
         battleLog.setText("");
-        log("⚔️ The Battle Begins. It's " + player.getName() + " VS " + enemy.getName() + "!");
+        setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Tutorial.png");
+        log("- The Battle Begins. It's " + player.getName() + " VS " + enemy.getName() + "!");
 
-        showDialog(
-                    "Welcome to Realms of Riftborne. I see you have selected " + player.getName() + ". Here's a little let-you-know:\n" +
-                    "[] You are pitted against a succession of enemies. Defeat each one of them to get through the levels.\n" +
-                    "[] Defeating a miniboss will allow you to proceed to the next realm.\n" +
-                    "[] You restore " + healAmount + " health after every battle.\n" +
-                    "[] Your skills are your main method of attack, and certain skills will go on cooldown for a set amount of turns.\n" +
-                    "[!] You are pitted against a succession of enemies. Defeat each one of them to get through the levels.\n" +
-                    "[!] Defeating a miniboss will allow you to proceed to the next realm.\n" +
-                    "[!] You restore " + healAmount + " health after every battle.\n" +
-                    "[!] Your skills are your main method of attack, and certain skills will go on cooldown for a set amount of turns.\n" +
-                    "[!] The Back button on the bottom right is disabled until AFTER the Tutorial!\n" +
-                    "Pick a skill to begin your turn!",
-                    "Tutorial");
+        showTutorial(
+                    " WELCOME TO REALMS OF RIFTBORNE \n\n" + 
+                    "I see you have selected " + player.getName() + ". Here's a little let-you-know:\n\n" +
+                    "[] You are pitted against a succession of enemies. Defeat each one of them to get through the levels.\n\n" +
+                    "[] Defeating a miniboss will allow you to proceed to the next realm.\n\n" +
+                    "[] You restore " + healAmount + " health after every battle.\n\n" +
+                    "[] Your skills are your main method of attack, and certain skills will go on cooldown for a set amount of turns.\n\n" +
+                    "[!] You are pitted against a succession of enemies. Defeat each one of them to get through the levels.\n\n" +
+                    "[!] Defeating a miniboss will allow you to proceed to the next realm.\n\n" +
+                    "[!] You restore " + healAmount + " health after every battle.\n\n" +
+                    "[!] Your skills are your main method of attack, and certain skills will go on cooldown for a set amount of turns.\n\n" +
+                    "[!] The Back button on the bottom right is disabled until AFTER the Tutorial!\n\n" +
+                    "Pick a skill to begin your turn!");
         
-                    log("\nChoose a skill to begin your turn.");
-    
-
-        log("\nChoose a skill to begin your turn.");
+        log("\n- Choose a skill to begin your turn.");
 
         updateSkillButtons();
     }
 
-
+    //Reminder thisll be obsolete soon
     private void showDialog(String message, String title) {
         SwingUtilities.invokeLater(() -> {
             JOptionPane.showMessageDialog(
@@ -342,11 +310,11 @@ public class BattlePanel extends JPanel {
         Skill s = player.getSkills()[index];
 
         if (s.isOnCooldown()) {
-            log("⏳ " + s.getName() + " is on cooldown for " + s.getCurrentCooldown() + " more turns!");
+            log("- " + s.getName() + " is on cooldown for " + s.getCurrentCooldown() + " more turns!");
             return;
         }
 
-        log(player.getName() + " uses " + s.getName() + "!");
+        log("- " + player.getName() + " uses " + s.getName() + "!");
 
         String type = s.getType();
         switch (type.toLowerCase()) {
@@ -357,26 +325,26 @@ public class BattlePanel extends JPanel {
                 // configure burn: tune these values as desired
                 burnDamageToEnemy = Math.max(1, s.getPower() / 3);
                 burnTurnsRemaining = 3; // DOT lasts 3 enemy turns
-                log("⚔️ Timeblade strikes for " + immediate + " damage and applies a burn (" + burnDamageToEnemy + " x " + burnTurnsRemaining + " turns)!");
+                log("- Timeblade strikes for " + immediate + " damage and applies a burn (" + burnDamageToEnemy + " x " + burnTurnsRemaining + " turns)!");
                 updateHPLabels();
                 break;
             case "shield":
                 playerShieldActive = true;
-                log("🛡️ Time Shield activated! You’ll block the next attack and get healed.");
+                log("- Time Shield activated! You’ll block the next attack and get healed.");
                 break;
             case "dodge":
                // Flashey's WindWalk: dodge incoming attack completely
                playerDodgeActive = true;
-               log("💨 WindWalk activated! You'll evade the next attack completely!");
+               log("- WindWalk activated! You'll evade the next attack completely!");
                break;
             case "reverse":
                 int lost = player.getMaxHealth() - player.getCurrentHealth();
                 int heal = (int) Math.ceil(lost * 0.5); // 50% of lost HP
                 if (heal <= 0) {
-                    log("♻️ Reverse F   low restores 0 HP (you are already at full health).");
+                    log("- Reverse Flow restores 0 HP (you are already at full health).");
                 } else {
                     player.setCurrentHealth(Math.min(player.getMaxHealth(), player.getCurrentHealth() + heal));
-                    log("♻️ Reverse Flow restores " + heal + " HP (50% of lost HP)!");
+                    log("- Reverse Flow restores " + heal + " HP (50% of lost HP)!");
                     updateHPLabels();
                 }
                 break;
@@ -385,20 +353,20 @@ public class BattlePanel extends JPanel {
                int lostHP = player.getMaxHealth() - player.getCurrentHealth();
                int healAmount = (int) Math.ceil(lostHP * 0.4);
                if (healAmount <= 0) {
-                   log("✨ " + s.getName() + " — you are already at full health!");
+                   log("- " + s.getName() + " — you are already at full health!");
                } else {
                    player.setCurrentHealth(Math.min(player.getMaxHealth(), player.getCurrentHealth() + healAmount));
-                   log("✨ " + s.getName() + " restores " + healAmount + " HP (40% of lost HP)!");
+                   log("- " + s.getName() + " restores " + healAmount + " HP (40% of lost HP)!");
                    updateHPLabels();
                }
                break;
             case "blind":
                 enemyBlinded = true;
-                log("🌑 " + s.getName() + " — " + enemy.getName() + " is blinded and will miss the next attack!");
+                log("- " + s.getName() + " — " + enemy.getName() + " is blinded and will miss the next attack!");
                 break;
             default:
                 enemy.takeDamage(s.getPower() + player.getAtk());
-                log("💥 " + enemy.getName() + " takes " + (s.getPower() + player.getAtk()) + " damage!");
+                log("- " + enemy.getName() + " takes " + (s.getPower() + player.getAtk()) + " damage!");
                 updateHPLabels();
                 break;
         }
@@ -444,7 +412,7 @@ public class BattlePanel extends JPanel {
     if (burnTurnsRemaining > 0 && enemy.isAlive()) {
         enemy.takeDamage(burnDamageToEnemy);
         burnTurnsRemaining--;
-        log("🔥 Burn deals " + burnDamageToEnemy + " damage to " + enemy.getName() + " (" + burnTurnsRemaining + " turns remaining).");
+        log("- Burn deals " + burnDamageToEnemy + " damage to " + enemy.getName() + " (" + burnTurnsRemaining + " turns remaining).");
         updateHPLabels();
         if (!enemy.isAlive()) {
             handleEnemyDefeat(enemy);
@@ -454,28 +422,28 @@ public class BattlePanel extends JPanel {
 
     // Enemy’s turn
     if (enemyBlinded) {
-       log("🌫️ " + enemy.getName() + " is blinded by Shadowveil and misses the attack!");
+       log("- " + enemy.getName() + " is blinded by Shadowveil and misses the attack!");
        enemyBlinded = false;
        lastDamageTakenByPlayer = 0;
    } else if (playerDodgeActive) {
-       log("💨 You dodge " + enemy.getName() + "'s attack with WindWalk!");
+       log("- You dodge " + enemy.getName() + "'s attack with WindWalk!");
        playerDodgeActive = false;
        lastDamageTakenByPlayer = 0;
    } else if (playerShieldActive) {
-       log("🛡️ The attack is blocked by your Time Shield!");
+       log("- The attack is blocked by your Time Shield!");
        playerShieldActive = false;
        lastDamageTakenByPlayer = 0;
    } else {
        int damage = Math.max(0, enemy.getAtk() - player.getDef());
        player.setCurrentHealth(player.getCurrentHealth() - damage);
        lastDamageTakenByPlayer = damage;
-       log("👹 " + enemy.getName() + " attacks! You take " + damage + " damage.");
+       log("- " + enemy.getName() + " attacks! You take " + damage + " damage.");
        updateHPLabels();
    }
 
     // Chrono Slash delayed damage
     if (delayedDamageToEnemy > 0 && enemy.isAlive()) {
-        log("💫 Chrono Slash triggers — " + delayedDamageToEnemy + " delayed damage!");
+        log("- Chrono Slash triggers — " + delayedDamageToEnemy + " delayed damage!");
         enemy.takeDamage(delayedDamageToEnemy);
         delayedDamageToEnemy = 0;
         updateHPLabels();
@@ -494,14 +462,14 @@ public class BattlePanel extends JPanel {
 
     // End turn check
     if (!player.isAlive()) {
-        log("💀 You were defeated...");
+        log("- You were defeated...");
         disableSkillButtons();
         return;
     }
 
     // Player’s next turn
     playerTurn = true;
-        log("Your turn! Choose your next skill.");
+        log("- Your turn! Choose your next skill.");
     }
     private void clearBattleLog() {
         battleLog.setText("");
@@ -509,7 +477,7 @@ public class BattlePanel extends JPanel {
 
 
    private void handleEnemyDefeat(Entity defeatedEnemy) {
-    log("🏆🏆🏆 You defeated the " + defeatedEnemy.getName() + "!");
+    log("- You defeated the " + defeatedEnemy.getName() + "!");
     disableSkillButtons();
 
     Timer nextBattleTimer = new Timer(700, e -> {
@@ -520,17 +488,16 @@ public class BattlePanel extends JPanel {
             if (defeatedEnemy instanceof Goblin) {
                 log("You have been blessed by the Rift's energy! 💪");
                 player.levelUp(0.10, 0.10);
-                showDialog(
+                showStoryOverlay(
                     "The Goblin collapses, dropping a strange sigil...\n" +
-                    "From the shadows, a hooded Cultist steps forward.",
-                    "Tutorial: Part II");
+                    "From the shadows, a hooded Cultist steps forward.");
                     updateSkillButtons();
 
                 enemy = new Cultist();
                 clearBattleLog();
                 enemyNameLabel.setText(enemy.getName());
                 enemyHPBar.updateHP(enemy.getCurrentHealth(), enemy.getMaxHealth());
-                log("🔥 A new foe approaches: " + enemy.getName() + "!");
+                log("- A new foe approaches: " + enemy.getName() + "!");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -539,18 +506,18 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof Cultist) {
-                showDialog(
+                showStoryOverlay(
                     "The Cultist's whisper fades: 'He... watches from the Rift...'\n\n" +
-                    "A surge of energy pulls you through — the Realms shift.",
-                    "End of Tutorial");
+                    "A surge of energy pulls you through — the Realms shift.");
 
                 mode = "Realm1";
-                showDialog(
-                    "🌩️ REALM I: AETHERIA 🌩️\n\n" +
+                showStoryOverlay(
+                    " REALM I: AETHERIA \n\n" +
                     "You awaken beneath stormy skies — Aetheria.\n" +
-                    "Sky Serpents circle above, lightning dancing across their scales.",
-                    "Chapter I: The Rift Opens");
+                    "Sky Serpents circle above, lightning dancing across their scales.");
                     updateSkillButtons();
+
+                setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Aetheria.png");
 
                 enemy = new SkySerpent();   
                 updateSkillButtons();
@@ -559,8 +526,8 @@ public class BattlePanel extends JPanel {
                 healBetweenBattles();
                 enemyNameLabel.setText(enemy.getName());
                 enemyHPBar.updateHP(enemy.getCurrentHealth(), enemy.getMaxHealth());
-                log("You recall the expeprience form your fight with tutorial and use it to grow stronger! 💪");
-                log("⚔️ A new foe approaches: " + enemy.getName() + "!");
+                log("- You recall the expeprience form your fight with tutorial and use it to grow stronger! 💪");
+                log("- A new foe approaches: " + enemy.getName() + "!");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -571,10 +538,9 @@ public class BattlePanel extends JPanel {
         // REALM I: AETHERIA
         if (mode.equals("Realm1")) {
             if (defeatedEnemy instanceof SkySerpent) {
-                showDialog(
+                showStoryOverlay(
                     "The Sky Serpent bursts into feathers and lightning.\n" +
-                    "From the thunderclouds above descends General Zephra, Storm Mage of the Rift.",
-                    "⚡ Boss Battle: General Zephra ⚡");
+                    "From the thunderclouds above descends General Zephra, Storm Mage of the Rift.");
                     updateSkillButtons();
 
                 enemy = new GeneralZephra();
@@ -583,8 +549,8 @@ public class BattlePanel extends JPanel {
                 healBetweenBattles();
                 enemyNameLabel.setText(enemy.getName());
                 enemyHPBar.updateHP(enemy.getCurrentHealth(), enemy.getMaxHealth());
-                log("You leveled up!💪");
-                log("⚡ A new foe approaches: " + enemy.getName() + "!");
+                log("- You leveled up!");
+                log("- A new foe approaches: " + enemy.getName() + "!");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -592,19 +558,19 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof GeneralZephra) {
-                showDialog(
+                showStoryOverlay(
                     "Zephra's thunderbird screeches as lightning fades.\n" +
-                    "A fiery rift tears open beneath you...",
-                    "🔥 Transition to Realm II: Ignara 🔥");
+                    "A fiery rift tears open beneath you...");
                     updateSkillButtons();
 
                 mode = "Realm2";
+                setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Ignara.png");
                 enemy = new MoltenImp();
                 clearBattleLog();
                 healBetweenBattles();
                 enemyNameLabel.setText(enemy.getName());
                 enemyHPBar.updateHP(enemy.getCurrentHealth(), enemy.getMaxHealth());
-                log("🔥 Realm II: Ignara — molten chaos awaits!");
+                log("- Realm II: Ignara — molten chaos awaits!");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -616,11 +582,11 @@ public class BattlePanel extends JPanel {
         if (mode.equals("Realm2")) {
             if (defeatedEnemy instanceof MoltenImp) {
                 player.levelUp(0.10, 0.10);
-                log("LEVEL UP!!!");
-                showDialog(
+                log("- LEVEL UP!!!");
+
+                showStoryOverlay(
                     "The last Molten Imp bursts into flame...\n" +
-                    "From the magma rises General Vulkrag, the Infernal Commander!",
-                    "🔥 Boss Battle: General Vulkrag 🔥");
+                    "From the magma rises General Vulkrag, the Infernal Commander!");
                     updateSkillButtons();
 
                 enemy = new GeneralVulkrag();
@@ -628,7 +594,7 @@ public class BattlePanel extends JPanel {
                 healBetweenBattles();
                 enemyNameLabel.setText(enemy.getName());
                 enemyHPBar.updateHP(enemy.getCurrentHealth(), enemy.getMaxHealth());
-                log("🔥 A new foe approaches: " + enemy.getName() + "!");
+                log("- A new foe approaches: " + enemy.getName() + "!");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -636,19 +602,19 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof GeneralVulkrag) {
-                showDialog(
+                showStoryOverlay(
                     "Vulkrag's molten armor cracks apart.\n" +
-                    "Darkness seeps in from the edges of reality...",
-                    "🌑 Transition to Realm III: Noxterra 🌑");
+                    "Darkness seeps in from the edges of reality...");
                     updateSkillButtons();
 
                 mode = "Realm3";
+                setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Noxterra.png");
                 enemy = new ShadowCreeper();
                 healBetweenBattles();
                 player.levelUp(0.15, 0.15);
                 enemyNameLabel.setText(enemy.getName());
-                log("You noticable feel stronger after defeating a general! 💪");
-                log("🌑 Realm III: Noxterra — the shadows hunger...");
+                log("- You noticable feel stronger after defeating a general! 💪");
+                log("- Realm III: Noxterra — the shadows hunger...");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -659,10 +625,9 @@ public class BattlePanel extends JPanel {
         // REALM III: NOXTERRA
         if (mode.equals("Realm3")) {
             if (defeatedEnemy instanceof ShadowCreeper) {
-                showDialog(
+                showStoryOverlay(
                     "The Shadow Creeper dissolves into mist...\n" +
-                    "A dark laughter echoes — the Rift Lord himself descends.",
-                    "💀 Final Boss: Lord Vorthnar 💀");
+                    "A dark laughter echoes — the Rift Lord himself descends.");
                     updateSkillButtons();
 
                 enemy = new Vorthnar();
@@ -671,8 +636,8 @@ public class BattlePanel extends JPanel {
                 healBetweenBattles();
                 enemyNameLabel.setText(enemy.getName());
                 enemyHPBar.updateHP(enemy.getCurrentHealth(), enemy.getMaxHealth());
-                log("You feel a surge of power course through you! 💪");
-                log("💀 The final boss approaches: " + enemy.getName() + "!");
+                log("- You feel a surge of power course through you! ");
+                log("- The final boss approaches: " + enemy.getName() + "!");
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
@@ -680,14 +645,12 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof Vorthnar) {
-                showDialog(
+                showStoryOverlay(
                     "Vorthnar collapses — time itself shatters, then reforms.\n\n" +
-                    "🏆 CHAPTER III COMPLETE 🏆\nYou have conquered the Realms!",
-                    "🎉 Victory!");
+                    "🏆 CHAPTER III COMPLETE 🏆\nYou have conquered the Realms!");
 
                 log("🎉 You defeated Lord Vorthnar! Chapter III complete!");
                 disableSkillButtons();
-                return;
             }
         }
     });
@@ -699,7 +662,7 @@ public class BattlePanel extends JPanel {
         int healAmount = player.getMaxHealth(); // changed from 60 to player.getMaxHealth()
         player.setCurrentHealth(Math.min(player.getMaxHealth(), player.getCurrentHealth() + healAmount));
         updateHPLabels();
-        log("💖 You have recovered your vitality for the next battle!");
+        log("- You have recovered your vitality for the next battle!");
     }
 
     private void updateHPLabels() {
@@ -759,24 +722,26 @@ public class BattlePanel extends JPanel {
 
         JLabel prompt = new JLabel("Exit to Main Menu?", SwingConstants.CENTER);
         prompt.setForeground(Color.WHITE);
-        prompt.setFont(pixelFont.deriveFont(20f));
+        prompt.setFont(GameFonts.pixelFont.deriveFont(20f));
         prompt.setBounds(10, 20, 300, 30);
         box.add(prompt);
 
         JButton yes = new JButton("Yes");
-        yes.setFont(pixelFont.deriveFont(18f));
+        yes.setFont(GameFonts.pixelFont.deriveFont(18f));
         yes.setFocusable(false);
         yes.setForeground(Color.WHITE);
         yes.setBackground(Color.BLACK);
         yes.setBounds(40, 90, 100, 40);
+        yes.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); 
         box.add(yes);
 
         JButton no = new JButton("No");
-        no.setFont(pixelFont.deriveFont(18f));
+        no.setFont(GameFonts.pixelFont.deriveFont(18f));
         no.setFocusable(false);
         no.setForeground(Color.WHITE);
         no.setBackground(Color.BLACK);
         no.setBounds(180, 90, 100, 40);
+        no.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); 
         box.add(no);
 
         yes.addActionListener(e -> {
@@ -794,9 +759,6 @@ public class BattlePanel extends JPanel {
             if (glass != null) glass.setVisible(false);
         });
     }
-
-    
-
 
     private void showExitOverlay() {
         if (glass != null) {
@@ -827,6 +789,190 @@ public class BattlePanel extends JPanel {
         }
     }
 
+     private void createStoryOverlay() {
+        storyOverlay = new JPanel(null);
+        storyOverlay.setBackground(new Color(0, 0, 0, 180)); // dark semi-transparent
+        storyOverlay.setVisible(false);
+
+        JPanel box = new JPanel(null);
+        box.setBackground(Color.BLACK);
+        box.setName("storyBox");
+        box.setBounds(0, 0, 520, 300);
+        box.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
+        box.setLayout(new BorderLayout());
+        storyOverlay.add(box);
+
+        storyText = new JLabel("", SwingConstants.CENTER);
+        storyText.setForeground(Color.WHITE);
+        storyText.setFont(GameFonts.pixelFont.deriveFont(32f));
+        storyText.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+        box.add(storyText, BorderLayout.CENTER);
+
+        storyContinue = new JLabel("PRESS ANY KEY TO CONTINUE >>", SwingConstants.RIGHT);
+        storyContinue.setOpaque(true);
+        storyContinue.setForeground(Color.WHITE);
+        storyContinue.setBackground(Color.BLACK);
+        storyContinue.setFont(GameFonts.pixelFont.deriveFont(24f));
+        storyContinue.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 20));
+        box.add(storyContinue, BorderLayout.SOUTH);
+
+        //Till next time type of effect
+        // startBlinking();
+
+
+        storyOverlay.addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                showNextStoryMessage();
+            }
+
+        });
+
+        storyOverlay.setFocusable(true);
+        storyOverlay.addKeyListener(new KeyAdapter() {
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                showNextStoryMessage();
+            }
+
+        });
+    }
+
+        public void showStoryOverlay(String text) {
+        storyQueue.enqueue(text);
+
+        if(!storyActive) {
+            showNextStoryMessage();
+        }        
+    }
+
+//Sakit sa mata ug ulo bruh
+//===============================================//
+        private void showNextStoryMessage() {
+        if (storyQueue.isEmpty()) {
+            storyActive = false;
+            hideStoryOverlay();
+            return;
+        }
+
+        storyActive = true;
+        String nextText = storyQueue.dequeue();
+
+        if (glass != null) glass.setVisible(true);
+
+        storyText.setText("<html><div style='text-align:center'>" + nextText.replace("\n", "<br>") + "</div></html>");
+
+        //Typewriter Effect, not ready
+        //storyNext.setText("");
+        //typetext(nextText);
+
+        storyOverlay.setBounds(0, 0, getWidth(), getHeight());
+        storyOverlay.setVisible(true);
+        storyOverlay.requestFocusInWindow();
+
+        for (Component c : storyOverlay.getComponents()) {
+            if ("storyBox".equals(c.getName())) {
+                int px = (storyOverlay.getWidth() - c.getWidth()) / 2;
+                int py = (storyOverlay.getHeight() - c.getHeight()) / 2;
+                c.setLocation(px, py);
+            }
+        }
+
+        glass.revalidate();
+        glass.repaint();
+    }
+//===============================================//
+    private void hideStoryOverlay() {
+        storyOverlay.setVisible(false);
+        if(glass != null) glass.setVisible(false);
+    }
+//===============================================//
+    private void createTutorialOverlay() {
+        tutorialOverlay = new JPanel(null);
+        tutorialOverlay.setBackground(new Color(0, 0, 0, 180));
+        tutorialOverlay.setVisible(false);
+
+        JPanel box = new JPanel(null);
+        box.setBackground(Color.BLACK);
+        box.setName("tutorialBox");
+        box.setBounds(0, 0, 900, 560); // MUCH LARGER
+        box.setBorder(BorderFactory.createLineBorder(Color.WHITE, 3));
+        box.setLayout(new BorderLayout());
+        tutorialOverlay.add(box);
+
+        tutorialText = new JLabel("", SwingConstants.CENTER);
+        tutorialText.setForeground(Color.WHITE);
+        tutorialText.setFont(GameFonts.pixelFont.deriveFont(20f));
+        tutorialText.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+        box.add(tutorialText, BorderLayout.CENTER);
+
+        tutorialContinue = new JLabel("PRESS ANY KEY TO CONTINUE >>", SwingConstants.RIGHT);
+        tutorialContinue.setOpaque(true);
+        tutorialContinue.setForeground(Color.WHITE);
+        tutorialContinue.setBackground(Color.BLACK);
+        tutorialContinue.setFont(GameFonts.pixelFont.deriveFont(23f));
+        tutorialContinue.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 20));
+        box.add(tutorialContinue, BorderLayout.SOUTH);
+
+        // input
+        tutorialOverlay.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                showNextTutorialMessage();
+            }
+        });
+        tutorialOverlay.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                showNextTutorialMessage();
+            }
+        });
+        tutorialOverlay.setFocusable(true);
+    }
+
+    public void showTutorial(String text) {
+        tutorialQueue.enqueue(text);
+
+        if (!tutorialActive) {
+            showNextTutorialMessage();
+        }
+    }
+
+    private void showNextTutorialMessage() {
+        if (tutorialQueue.isEmpty()) {
+            tutorialActive = false;
+            tutorialOverlay.setVisible(false);
+            if (glass != null) glass.setVisible(false);
+            return;
+        }
+
+        tutorialActive = true;
+
+        String nextText = tutorialQueue.dequeue();
+
+        if (glass != null) glass.setVisible(true);
+
+        tutorialText.setText("<html><div style='text-align:center'>" +
+            nextText.replace("\n","<br>") +
+            "</div></html>");
+
+        tutorialOverlay.setBounds(0, 0, getWidth(), getHeight());
+        tutorialOverlay.setVisible(true);
+        tutorialOverlay.requestFocusInWindow();
+
+        for (Component c : tutorialOverlay.getComponents()) {
+            if ("tutorialBox".equals(c.getName())) {
+                int px = (tutorialOverlay.getWidth() - c.getWidth()) / 2;
+                int py = (tutorialOverlay.getHeight() - c.getHeight()) / 2;
+                c.setLocation(px, py);
+            }
+        }
+
+        glass.revalidate();
+        glass.repaint();
+}
 
     @Override
     public void doLayout() {
@@ -850,8 +996,34 @@ public class BattlePanel extends JPanel {
                 );
             }
         }
-    }
 
+        if (storyOverlay != null) {
+            storyOverlay.setBounds(0, 0, getWidth(), getHeight());
+
+            for (Component c : storyOverlay.getComponents()) {
+                if ("storyBox".equals(c.getName())) {
+                    c.setLocation(
+                        (storyOverlay.getWidth() - c.getWidth()) / 2,
+                        (storyOverlay.getHeight() - c.getHeight()) / 2
+                    );
+                }
+            }
+        }
+
+        if(tutorialOverlay != null) {
+            tutorialOverlay.setBounds(0, 0, getWidth(), getHeight());
+        }
+
+        for(Component c : tutorialOverlay.getComponents()) {
+            if("tutorialBox".equals(c.getName())) {
+                c.setLocation(
+                (tutorialOverlay.getWidth() - c.getWidth()) / 2,
+                (tutorialOverlay.getHeight() - c.getHeight()) / 2
+                );
+            }
+        }
+    }
+//===============================================//
     @Override
     public void addNotify() {
         super.addNotify();
@@ -863,8 +1035,10 @@ public class BattlePanel extends JPanel {
             glass.setOpaque(false);
 
             createExitOverlay();
+            createStoryOverlay();
+            createTutorialOverlay();
 
-            // absorb all mouse events (so battle UI becomes unclickable)
+            //battle UI becomes unclickable
             glass.addMouseListener(new MouseAdapter() {});
             glass.addMouseMotionListener(new MouseMotionAdapter() {});
             
@@ -874,61 +1048,109 @@ public class BattlePanel extends JPanel {
                 glass.revalidate();
                 glass.repaint();
             }
+
+            if(glass != null && tutorialOverlay != null && tutorialOverlay.getParent() != glass) {
+                glass.add(tutorialOverlay);
+                tutorialOverlay.setBounds(0, 0, getWidth(), getHeight());
+                glass.revalidate();
+                glass.repaint();
+            }
+
+            if(glass != null && storyOverlay != null && storyOverlay.getParent() != glass) {
+                glass.add(storyOverlay);
+                storyOverlay.setBounds(0, 0, getWidth(), getHeight());
+                glass.revalidate();
+                glass.repaint();
+            }
+
+            for(Component c : storyOverlay.getComponents()) {
+                if("storyBox".equals(c.getName())) {
+                    int px = (storyOverlay.getWidth() - c.getWidth()) / 2;
+                    int py = (storyOverlay.getHeight() - c.getHeight()) / 2;
+                    c.setLocation(px, py);
+                }
+            }
         }
     }
 
-    class WhiteScrollBarUI extends BasicScrollBarUI {
 
-        @Override
-        protected void configureScrollBarColors() {
-            thumbColor = Color.WHITE;
-            trackColor = Color.BLACK;
-        }
+    //Effects parts to be transed later
 
-        @Override
-        protected void paintTrack(Graphics g, JComponent c, Rectangle trackBounds) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    //With how StoryCont() is structed storyText bounces up and down. Until i find a fix this remains commented :(
+    // private void startBlinking() {
+    //     Timer t = new Timer(500, e -> {
+    //         storyContinue.setVisible(!storyContinue.isVisible());
+    //     });
+    //     t.start();
+    // }
 
-            // Black background
-            g2.setColor(Color.BLACK);
-            g2.fillRect(trackBounds.x, trackBounds.y, trackBounds.width, trackBounds.height);
+    //Typewriter eff,  still need minor fixes in storyOverlay so no jumpy effs
+    //TODO: Test setPreferredsize() on overlay, u never know ;)
+    // private void typeText(String fullText) {
+    //     String cleaned = "<html><div style='text-align:center'>" +
+    //         fullText.replace("\n", "<br>") + "</div></html>";
 
-            // White outline
-            g2.setColor(Color.WHITE);
-            g2.drawRect(trackBounds.x, trackBounds.y, trackBounds.width - 1, trackBounds.height - 1);
+    //     final StringBuilder current = new StringBuilder();
+    //     final char[] chars = cleaned.toCharArray();
 
-            g2.dispose();
-        }
+    //     Timer typeTimer = new Timer(10, null);
+    //     typeTimer.addActionListener(e -> {
+    //         if (current.length() < chars.length) {
+    //             current.append(chars[current.length()]);
+    //             storyText.setText(current.toString());
+    //         } else {
+    //             typeTimer.stop();
+    //         }
+    //     });
+    //     typeTimer.start();
+    // }
 
-        @Override
-        protected void paintThumb(Graphics g, JComponent c, Rectangle thumbBounds) {
-            if (!scrollbar.isEnabled() || thumbBounds.width > thumbBounds.height) return;
 
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    private Image backgroundImage;
 
-            g2.setColor(Color.WHITE);
-            g2.fillRoundRect(thumbBounds.x, thumbBounds.y, thumbBounds.width, thumbBounds.height, 10, 10);
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
 
-            g2.dispose();
-        }
+        if (backgroundImage != null) {
 
-        // REMOVE ARROWS
-        @Override
-        protected JButton createDecreaseButton(int orientation) { return createZeroButton(); }
-        @Override
-        protected JButton createIncreaseButton(int orientation) { return createZeroButton(); }
+            // Orig image size
+            int imgWidth  = backgroundImage.getWidth(null);
+            int imgHeight = backgroundImage.getHeight(null);
 
-        private JButton createZeroButton() {
-            JButton btn = new JButton();
-            btn.setPreferredSize(new Dimension(0, 0));
-            btn.setMinimumSize(new Dimension(0, 0));
-            btn.setMaximumSize(new Dimension(0, 0));
-            btn.setBorder(null);
-            btn.setFocusable(false);
-            btn.setOpaque(false);
-            return btn;
+            // Aspect ratios
+            double imgAspect   = (double) imgWidth / imgHeight;
+            double panelAspect = (double) getWidth() / getHeight();
+
+            int drawWidth, drawHeight;
+
+            if (panelAspect > imgAspect) {
+                // basically if panel is wider, I-match ang height
+                drawHeight = getHeight();
+                drawWidth = (int) (drawHeight * imgAspect);
+            } else {
+                // Opposite of above
+                drawWidth = getWidth();
+                drawHeight = (int) (drawWidth / imgAspect);
+            }
+
+            // Center it
+            int x = (getWidth() - drawWidth) / 2;
+            int y = (getHeight() - drawHeight) / 2;
+
+            g.drawImage(backgroundImage, x, y, drawWidth, drawHeight, this);
         }
     }
+
+    public void setBackgroundImage(String path) {
+        try {
+            backgroundImage = ImageIO.read(getClass().getResource(path));
+            repaint();
+        } catch (Exception e) {
+            System.out.println("Could not load background: " + path);
+            e.printStackTrace();
+        }
+    }
+
+
 }

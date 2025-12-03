@@ -11,9 +11,10 @@ public class GameFrame extends JFrame {
 
     public GameFrame() {
         setTitle("Realms of Riftborne");
-        setSize(800, 600);
+        setSize(1280, 720);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setResizable(false);
 
         getContentPane().setLayout(new CardLayout());
 

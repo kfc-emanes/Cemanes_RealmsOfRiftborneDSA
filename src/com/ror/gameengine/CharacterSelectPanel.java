@@ -1,8 +1,11 @@
 package com.ror.gameengine;
 
-//import com.ror.gamemodel.*;
-import javax.swing.*;
+import com.ror.gameutil.GameFonts;
 import java.awt.*;
+import java.awt.event.*;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+
 
 public class CharacterSelectPanel extends JPanel {
     private JButton backButton;
@@ -10,133 +13,162 @@ public class CharacterSelectPanel extends JPanel {
     private JButton flameWarriorButton;
     private JButton skyMageButton;
     private JButton NyxButton;    
-    private JButton TharnButton;  
-    //private JButton slot2Button;
-    //private JButton slot3Button;
-    //private JButton slot4Button;
-    //private JButton slot5Button;
+    private JButton TharnButton; 
+    private Image backgroundImage;
 
-    private GameFrame parent; // reference to GameFrame
+
+    private GameFrame parent;
 
     public CharacterSelectPanel(GameFrame parent) {
         this.parent = parent;
-        setLayout(new BorderLayout());
-        setBackground(Color.DARK_GRAY);
+        setLayout(null);
+        setBackground(Color.BLACK);
+
+       setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Riftborne.png");
+
 
         // Title 
         JLabel title = new JLabel("Select Your Character", SwingConstants.CENTER);
-        title.setFont(new Font("Century Gothic", Font.BOLD, 26));
+        title.setFont(GameFonts.pixelFont.deriveFont(36f));
         title.setForeground(Color.WHITE);
+        title.setBounds(0, 40, 1280, 60);
+        add(title);
 
-        // Character Buttons
-        JPanel characterPanel = new JPanel(new GridLayout(1, 5, 12, 12));
-        characterPanel.setBackground(Color.DARK_GRAY);
+        addCharacterBox("Andrew ( Time Blade )", "/com/ror/gamemodel/Assets/Images/Andrew.png",
+                140, 160, e -> parent.showBattle(new com.ror.gamemodel.Playable.Andrew()));
 
-        andrewButton = createImageButton("Andrew (Timeblade)", "/com/ror/gamemodel/Assets/Images/Andrew.png");
-        flameWarriorButton = createImageButton("Drax (Flame Warrior)", "/com/ror/gamemodel/Assets/Images/Drax.png");
-        skyMageButton = createImageButton("Flashey (Sky Mage)", "/com/ror/gamemodel/Assets/Images/Flashley.png");
-        NyxButton = createImageButton("Nyx (Assassin)", "/com/ror/gamemodel/Assets/Images/Nyx.png");
-        TharnButton = createImageButton("Tharn (Stone Golem)", "/com/ror/gamemodel/Assets/Images/Tharn.png");
+        addCharacterBox("Flashey ( Sky Mage )", "/com/ror/gamemodel/Assets/Images/Flashley.png",
+                740, 160, e -> parent.showBattle(new com.ror.gamemodel.Playable.SkyMage()));
 
-        characterPanel.add(andrewButton);
-        characterPanel.add(flameWarriorButton);
-        characterPanel.add(skyMageButton);
-        characterPanel.add(NyxButton);
-        characterPanel.add(TharnButton);
+        addCharacterBox("Drax ( Flame Warrior )", "/com/ror/gamemodel/Assets/Images/Drax.png",
+                140, 340, e -> parent.showBattle(new com.ror.gamemodel.Playable.FlameWarrior()));
 
-        //Back Button
-        backButton = new JButton("Back to Menu >>>");
+        addCharacterBox("Nyx ( Assassin )", "/com/ror/gamemodel/Assets/Images/Nyx.png",
+                740, 340, e -> parent.showBattle(new com.ror.gamemodel.Playable.Nyx()));
 
-        //Layout
-        add(title, BorderLayout.NORTH);
-        add(characterPanel, BorderLayout.CENTER);
-        add(backButton, BorderLayout.SOUTH);
+        addCharacterBox("Tharn ( Stone Golem )", "/com/ror/gamemodel/Assets/Images/Tharn.png",
+                440, 520, e -> parent.showBattle(new com.ror.gamemodel.Playable.Tharn()));
 
-        //Button Logic
-        andrewButton.addActionListener(e -> parent.showBattle(new com.ror.gamemodel.Playable.Andrew()));
-        backButton.addActionListener(e -> parent.showMenu());
-        flameWarriorButton.addActionListener(e -> parent.showBattle(new com.ror.gamemodel.Playable.FlameWarrior()));
-        skyMageButton.addActionListener(e -> parent.showBattle(new com.ror.gamemodel.Playable.SkyMage()));
-        NyxButton.addActionListener(e -> parent.showBattle(new com.ror.gamemodel.Playable.Nyx()));
-        TharnButton.addActionListener(e -> parent.showBattle(new com.ror.gamemodel.Playable.Tharn()));
+        JButton back = new JButton();
+        back.setBounds(1180, 35, 60, 60);
+        back.setContentAreaFilled(false);
+        back.setBorder(null);
+        back.setFocusPainted(false);
+        back.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        //setIcon
+        back.addActionListener(e -> parent.showMenu());
+        add(back);
 
-
-        // Disable locked slots
-        //slot4Button.setEnabled(false);
-       // slot5Button.setEnabled(false);
     }
 
-    //IMAGES BEHIND BUTTONS
-    private JButton createImageButton(String label, String imgPath) {
-        
-        try {
-        ImageIcon icon = new ImageIcon(getClass().getResource(imgPath));
-        Image rawImg = icon.getImage();
+   private void addCharacterBox(String name, String path, int x, int y, ActionListener clickAction) {
 
-        JButton button = new JButton(label) {
+        JPanel box = new JPanel(null);
+        box.setBounds(x, y, 400, 120);
+        box.setBackground(Color.BLACK);
+        box.setBorder(BorderFactory.createLineBorder(Color.WHITE, 3));
+
+        box.addMouseListener(new MouseAdapter() {
+
             @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-
-                int bw = getWidth();
-                int bh = getHeight();
-                int imgW = rawImg.getWidth(null);
-                int imgH = rawImg.getHeight(null);
-
-                double scale = Math.max(
-                    (double) bw / imgW,
-                    (double) bh / imgH
-                );
-
-                int newW = (int) (imgW * scale);
-                int newH = (int) (imgH * scale);
-
-                int x = (bw - newW) / 2;
-                int y = (bh - newH) / 2;
-
-                g.drawImage(rawImg, x, y, newW, newH, this);
-
-                Graphics2D g2d = (Graphics2D) g;
-                int fontSize = bh / 35;
-                g2d.setFont(new Font("Century Gothic", Font.BOLD, fontSize));
-
-                FontMetrics fm = g2d.getFontMetrics();
-                int txtW = fm.stringWidth(label);
-                int txtH = fm.getAscent();
-
-                int tx = (bw - txtW) / 2;
-                int ty = (bh + txtH) / 2 - 3;
-
-                g2d.setColor(Color.BLACK);
-                g2d.drawString(label, tx - 1, ty - 1);
-                g2d.drawString(label, tx - 1, ty + 1);
-                g2d.drawString(label, tx + 1, ty - 1);
-                g2d.drawString(label, tx + 1, ty + 1);
-
-                g2d.setColor(getForeground());
-                g2d.drawString(label, tx, ty);
+            public void mouseEntered(MouseEvent e) {
+                box.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 3));
+                box.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); 
             }
-        };
 
-        button.setHorizontalTextPosition(SwingConstants.CENTER);
-        button.setVerticalTextPosition(SwingConstants.CENTER);
+            @Override
+            public void mouseExited(MouseEvent e) {
+                box.setBorder(BorderFactory.createLineBorder(Color.WHITE, 3));
+            }
 
-        button.setContentAreaFilled(false);
-        button.setBorderPainted(false);
-        button.setFocusPainted(false);
-        button.setOpaque(false);
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                clickAction.actionPerformed(null);
+            }
+        });
 
-        button.setForeground(Color.WHITE);
-        button.setFont(new Font("Century Gothic", Font.BOLD, 16));
-        
-        return button;
+        int spriteX = 20, spriteY = 12, spriteW = 96, spriteH = 96;
+        JLabel sprite;
+        try {
+            ImageIcon icon = loadScaledIcon(path, spriteW, spriteH);
+            sprite = new JLabel(icon);
+            // center inside the 96x96 cell so image isnt a clusterfuck
+            int imgW = icon.getIconWidth();
+            int imgH = icon.getIconHeight();
+            int offsetX = spriteX + (spriteW - imgW) / 2;
+            int offsetY = spriteY + (spriteH - imgH) / 2;
+            sprite.setBounds(offsetX, offsetY, imgW, imgH);
+        } catch (Exception ex) {
+            // failsafe: placeholder square centered in sprite cell
+            sprite = new JLabel();
+            sprite.setOpaque(true);
+            sprite.setBackground(Color.DARK_GRAY);
+            sprite.setBounds(spriteX + 10, spriteY + 10, spriteW - 20, spriteH - 20);
+        }
+        box.add(sprite);
+
+        JLabel label = new JLabel(name);
+        label.setForeground(Color.WHITE);
+        label.setFont(GameFonts.pixelFont.deriveFont(28f));
+        label.setBounds(120, 40, 280, 40);
+        box.add(label);
+
+        add(box);
+   }
+
+   private ImageIcon loadScaledIcon(String path, int w, int h) throws Exception {
+    ImageIcon src = new ImageIcon(getClass().getResource(path));
+    Image img = src.getImage();
+    if(img == null) throw new Exception("Null imo image: " + path);
+
+    int iw = img.getWidth(null);
+    int ih = img.getHeight(null);
+
+    if(iw <= 0 || ih <= 0) throw new Exception("Dim imo image: " + path);
+
+    double scale = Math.min((double) w / iw, (double) h / ih);
+    int newW = (int) Math.round(iw * scale);
+    int newH = (int) Math.round(ih * scale);
+
+    Image scaled = img.getScaledInstance(newW, newH, Image.SCALE_SMOOTH);
+    return new ImageIcon(scaled);
+   }
+
+    public void setBackgroundImage(String path) {
+        try {
+            backgroundImage = ImageIO.read(getClass().getResource(path));
+            repaint();
         } catch (Exception e) {
-            System.err.println("Error loading image for button: " + imgPath);
-            JButton fallbackButton = new JButton(label);
-            fallbackButton.setFont(new Font("Century Gothic", Font.BOLD, 16));
-            return fallbackButton;
+            System.out.println("Could not load background: " + path);
+            e.printStackTrace();
         }
     }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+      if (backgroundImage != null) {
+            int imgW = backgroundImage.getWidth(null);
+            int imgH = backgroundImage.getHeight(null);
+            double imgAspect = (double) imgW / imgH;
+            double panelAspect = (double) getWidth() / getHeight();
+
+            int drawW, drawH;
+            if (panelAspect > imgAspect) {
+                drawH = getHeight();
+                drawW = (int) (drawH * imgAspect);
+            } else {
+                drawW = getWidth();
+                drawH = (int) (drawW / imgAspect);
+            }
+            int x = (getWidth() - drawW) / 2;
+            int y = (getHeight() - drawH) / 2;
+            g.drawImage(backgroundImage, x, y, drawW, drawH, this);
+        }
+    }
+
+
 
     // Getter (for flexibility)
     public JButton getAndrewButton() { return andrewButton; }
