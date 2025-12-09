@@ -507,13 +507,13 @@ public class BattlePanel extends JPanel {
                 Music.stop();
                 showStoryOverlay(
                     "The Cultist's whisper fades: 'He... watches from the Rift...'\n\n" +
-                    "A surge of energy pulls you through — the Realms shift.");
+                    "A surge of energy pulls you through - the Realms shift.");
 
                 mode = "Realm1";
                 MusicController.play("/com/ror/gamemodel/Assets/sfx/AetheriaTheme.ogg", true);
                 showStoryOverlay(
                     " REALM I: AETHERIA \n\n" +
-                    "You awaken beneath stormy skies — Aetheria.\n" +
+                    "You awaken beneath stormy skies - Aetheria.\n" +
                     "Sky Serpents circle above, lightning dancing across their scales.");
                     updateSkillButtons();
 

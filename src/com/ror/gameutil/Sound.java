@@ -40,12 +40,10 @@ public class Sound {
             clip.open(ais);
             clip.start();
 
-            // After sound finishes, trigger callback
             clip.addLineListener(event -> {
                 if (event.getType() == LineEvent.Type.STOP) {
                     clip.close();
 
-                    // Run callback on Swing thread
                     SwingUtilities.invokeLater(after);
                 }
             });
