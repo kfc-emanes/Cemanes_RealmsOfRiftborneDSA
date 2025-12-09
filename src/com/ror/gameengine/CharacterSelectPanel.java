@@ -1,6 +1,7 @@
 package com.ror.gameengine;
 
 import com.ror.gameutil.GameFonts;
+import com.ror.gameutil.Sound;
 import java.awt.*;
 import java.awt.event.*;
 import javax.imageio.ImageIO;
@@ -84,6 +85,7 @@ public class CharacterSelectPanel extends JPanel {
             @Override
             public void mouseClicked(MouseEvent e) {
                 clickAction.actionPerformed(null);
+                Sound.play("/com/ror/gamemodel/Assets/sfx/BtnClick.wav");
             }
         });
 

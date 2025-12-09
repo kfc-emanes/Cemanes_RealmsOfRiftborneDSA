@@ -1,6 +1,7 @@
 package com.ror.gameengine;
 
 import com.ror.gameutil.GameFonts;
+import com.ror.gameutil.MusicController;
 import com.ror.gameutil.UIUtils;
 import java.awt.*;
 import javax.imageio.ImageIO;
@@ -16,6 +17,7 @@ public class MenuPanel extends JPanel {
         this.parent = parent;
         setLayout(new BorderLayout());
         setBackground(Color.BLACK);
+        MusicController.play("/com/ror/gamemodel/Assets/sfx/Main.ogg", true);
 
         // Title
         JLabel title = new JLabel("Realms Of Riftborne", SwingConstants.CENTER);

@@ -1,6 +1,7 @@
 package com.ror.gameengine;
 
 import com.ror.gamemodel.*;
+import com.ror.gameutil.MusicController;
 import java.awt.*;
 import javax.swing.*;
 
@@ -31,6 +32,7 @@ public class GameFrame extends JFrame {
     }
 
     public void showMenu() {
+        MusicController.play("/com/ror/gamemodel/Assets/sfx/Main.ogg", true);
         ((CardLayout) getContentPane().getLayout()).show(getContentPane(), "Menu");
     }
 

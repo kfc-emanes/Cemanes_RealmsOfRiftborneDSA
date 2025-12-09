@@ -43,6 +43,10 @@ public class UIUtils {
                     new EmptyBorder(12, 28, 12, 28)
                 ));
             }
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                Sound.play("/com/ror/gamemodel/Assets/sfx/BattleClick.wav");
+            }
         });
         
         b.setPreferredSize(new Dimension(220, 64));

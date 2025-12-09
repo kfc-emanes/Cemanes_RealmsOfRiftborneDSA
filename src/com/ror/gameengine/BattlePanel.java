@@ -41,6 +41,7 @@ public class BattlePanel extends JPanel {
     private int burnDamageToEnemy = 0;         
     private int burnTurnsRemaining = 0;        
     private int lastDamageTakenByPlayer = 0;
+    private int playerShieldTurns;
     private String mode = "Tutorial";
     private WorldManager worldManager = new WorldManager();
     private boolean storyActive = false, tutorialActive = false;
@@ -65,7 +66,7 @@ public class BattlePanel extends JPanel {
         //LEFT GAME TITLE
         JLabel titleLabel = new JLabel("Realms of Riftborne", SwingConstants.LEFT);
         titleLabel.setForeground(Color.WHITE);
-        titleLabel.setFont(GameFonts.pixelFont.deriveFont(16f));
+        titleLabel.setFont(GameFonts.pixelFont.deriveFont(18f));
         topContainer.add(titleLabel, BorderLayout.WEST);
 
         JPanel cornerIcons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
@@ -96,7 +97,7 @@ public class BattlePanel extends JPanel {
         // LEFT — Enemy Name
         enemyNameLabel = new JLabel("Enemy", SwingConstants.CENTER);
         enemyNameLabel.setForeground(Color.WHITE);
-        enemyNameLabel.setFont(GameFonts.pixelFont.deriveFont(20f));
+        enemyNameLabel.setFont(GameFonts.pixelFont.deriveFont(22f));
         enemyNameLabel.setBorder(new EmptyBorder(0, 6, 0, 6));
         enemyFrame.add(enemyNameLabel, BorderLayout.WEST);
 
@@ -113,7 +114,7 @@ public class BattlePanel extends JPanel {
         // RIGHT — HP LABEL
         enemyHPLabel = new JLabel("HP: --/--", SwingConstants.RIGHT);
         enemyHPLabel.setForeground(Color.WHITE);
-        enemyHPLabel.setFont(GameFonts.pixelFont.deriveFont(18f));
+        enemyHPLabel.setFont(GameFonts.pixelFont.deriveFont(20f));
 
         JPanel enemyRight = new JPanel(new BorderLayout());
         enemyRight.setBackground(Color.BLACK);
@@ -132,7 +133,7 @@ public class BattlePanel extends JPanel {
         battleLog.setForeground(Color.WHITE);
         battleLog.setLineWrap(true);
         battleLog.setWrapStyleWord(true);
-        battleLog.setFont(GameFonts.pixelFont.deriveFont(18f));
+        battleLog.setFont(GameFonts.pixelFont.deriveFont(20f));
         battleLog.setOpaque(false); // ← important
 
         logScroll = new JScrollPane(battleLog);
@@ -163,13 +164,13 @@ public class BattlePanel extends JPanel {
 
         playerNameLabel = new JLabel("Player", SwingConstants.CENTER);
         playerNameLabel.setForeground(Color.WHITE);
-        playerNameLabel.setFont(GameFonts.pixelFont.deriveFont(20f));
+        playerNameLabel.setFont(GameFonts.pixelFont.deriveFont(22f));
         playerNameLabel.setBorder(new EmptyBorder(0, 6, 0, 6));
 
         playerLevelLabel = new JLabel("Lv: 1", SwingConstants.LEFT);
         playerLevelLabel.setBorder(new EmptyBorder(0, 0, 0, 12));
         playerLevelLabel.setForeground(Color.WHITE);
-        playerLevelLabel.setFont(GameFonts.pixelFont.deriveFont(16f));
+        playerLevelLabel.setFont(GameFonts.pixelFont.deriveFont(18f));
 
         playerHPBar = new HPBar(1, 1);
         playerHPBar.setPreferredSize(new Dimension(300, 18));
@@ -177,7 +178,7 @@ public class BattlePanel extends JPanel {
         playerHPLabel = new JLabel("HP: --/--", SwingConstants.RIGHT);
         playerHPLabel.setBorder(new EmptyBorder(0, 12, 0, 6));
         playerHPLabel.setForeground(Color.WHITE);
-        playerHPLabel.setFont(GameFonts.pixelFont.deriveFont(16f));
+        playerHPLabel.setFont(GameFonts.pixelFont.deriveFont(20f));
 
         JPanel playerCenter = new JPanel(new BorderLayout(6, 0));
         playerCenter.setBackground(Color.BLACK);
@@ -201,7 +202,7 @@ public class BattlePanel extends JPanel {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(18, 18, 0, 18);
 
-        Font btnFont = GameFonts.pixelFont.deriveFont(18f);
+        Font btnFont = GameFonts.pixelFont.deriveFont(22f);
 
         skillBtn1 = new JButton("Skill 1");
         skillBtn2 = new JButton("Skill 2");
@@ -235,6 +236,7 @@ public class BattlePanel extends JPanel {
         lastDamageTakenByPlayer = 0;
         playerTurn = true;
         mode = "Tutorial";
+        MusicController.play("/com/ror/gamemodel/Assets/sfx/Tutorial.ogg", true);
         
         //=============================================
         //PLAYER + ENEMY WITH HP LABEL UPDATE
@@ -287,18 +289,6 @@ public class BattlePanel extends JPanel {
         updateSkillButtons();
     }
 
-    //Reminder thisll be obsolete soon
-    private void showDialog(String message, String title) {
-        SwingUtilities.invokeLater(() -> {
-            JOptionPane.showMessageDialog(
-                SwingUtilities.getWindowAncestor(this),
-                message,
-                title,
-                JOptionPane.INFORMATION_MESSAGE
-            );
-        });
-    }
-
     private void clearListeners() {
         for (ActionListener al : skillBtn1.getActionListeners()) skillBtn1.removeActionListener(al);
         for (ActionListener al : skillBtn2.getActionListeners()) skillBtn2.removeActionListener(al);
@@ -329,8 +319,8 @@ public class BattlePanel extends JPanel {
                 updateHPLabels();
                 break;
             case "shield":
-                playerShieldActive = true;
-                log("- Time Shield activated! You’ll block the next attack and get healed.");
+                playerShieldTurns = 2; // lasts for 2 enemy attacks
+                log("- Time Shield bends time around you! Incoming damage reduced by 50% for 2 turns!");
                 break;
             case "dodge":
                // Flashey's WindWalk: dodge incoming attack completely
@@ -429,10 +419,18 @@ public class BattlePanel extends JPanel {
        log("- You dodge " + enemy.getName() + "'s attack with WindWalk!");
        playerDodgeActive = false;
        lastDamageTakenByPlayer = 0;
-   } else if (playerShieldActive) {
-       log("- The attack is blocked by your Time Shield!");
-       playerShieldActive = false;
-       lastDamageTakenByPlayer = 0;
+   } else if (playerShieldTurns > 0) {
+
+       int damage = Math.max(0, enemy.getAtk() - player.getDef());
+       int reduced = damage / 2;
+       player.setCurrentHealth(player.getCurrentHealth() - reduced);
+       lastDamageTakenByPlayer = reduced;
+
+       log("- Time Shield distorts impact! Damge reduced from" + damage + " to " + reduced + ".");
+
+       playerShieldTurns--;
+       updateHPLabels();
+
    } else {
        int damage = Math.max(0, enemy.getAtk() - player.getDef());
        player.setCurrentHealth(player.getCurrentHealth() - damage);
@@ -506,11 +504,13 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof Cultist) {
+                Music.stop();
                 showStoryOverlay(
                     "The Cultist's whisper fades: 'He... watches from the Rift...'\n\n" +
                     "A surge of energy pulls you through — the Realms shift.");
 
                 mode = "Realm1";
+                MusicController.play("/com/ror/gamemodel/Assets/sfx/AetheriaTheme.ogg", true);
                 showStoryOverlay(
                     " REALM I: AETHERIA \n\n" +
                     "You awaken beneath stormy skies — Aetheria.\n" +
@@ -558,12 +558,14 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof GeneralZephra) {
+                Music.stop();
                 showStoryOverlay(
                     "Zephra's thunderbird screeches as lightning fades.\n" +
                     "A fiery rift tears open beneath you...");
                     updateSkillButtons();
 
                 mode = "Realm2";
+                MusicController.play("/com/ror/gamemodel/Assets/sfx/IgnaraTheme.ogg", true);
                 setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Ignara.png");
                 enemy = new MoltenImp();
                 clearBattleLog();
@@ -602,12 +604,14 @@ public class BattlePanel extends JPanel {
             }
 
             if (defeatedEnemy instanceof GeneralVulkrag) {
+                Music.stop();
                 showStoryOverlay(
                     "Vulkrag's molten armor cracks apart.\n" +
                     "Darkness seeps in from the edges of reality...");
                     updateSkillButtons();
 
                 mode = "Realm3";
+                MusicController.play("/com/ror/gamemodel/Assets/sfx/NoxterraTheme.ogg", true);
                 setBackgroundImage("/com/ror/gamemodel/Assets/Backgrounds/Noxterra.png");
                 enemy = new ShadowCreeper();
                 healBetweenBattles();
@@ -625,9 +629,11 @@ public class BattlePanel extends JPanel {
         // REALM III: NOXTERRA
         if (mode.equals("Realm3")) {
             if (defeatedEnemy instanceof ShadowCreeper) {
+                MusicController.stop();
                 showStoryOverlay(
                     "The Shadow Creeper dissolves into mist...\n" +
                     "A dark laughter echoes — the Rift Lord himself descends.");
+                    
                     updateSkillButtons();
 
                 enemy = new Vorthnar();
@@ -641,6 +647,10 @@ public class BattlePanel extends JPanel {
                 updateHPLabels();
                 enableSkillButtons();
                 playerTurn = true;
+
+                Sound.playThen("/com/ror/gamemodel/Assets/sfx/laugh.wav", () -> {
+                    MusicController.play("/com/ror/gamemodel/Assets/sfx/Vorthar.ogg", true);
+                });
                 return;
             }
 
@@ -806,6 +816,7 @@ public class BattlePanel extends JPanel {
         storyText.setForeground(Color.WHITE);
         storyText.setFont(GameFonts.pixelFont.deriveFont(32f));
         storyText.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+
         box.add(storyText, BorderLayout.CENTER);
 
         storyContinue = new JLabel("PRESS ANY KEY TO CONTINUE >>", SwingConstants.RIGHT);
@@ -815,9 +826,6 @@ public class BattlePanel extends JPanel {
         storyContinue.setFont(GameFonts.pixelFont.deriveFont(24f));
         storyContinue.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 20));
         box.add(storyContinue, BorderLayout.SOUTH);
-
-        //Till next time type of effect
-        // startBlinking();
 
 
         storyOverlay.addMouseListener(new MouseAdapter() {
@@ -862,11 +870,11 @@ public class BattlePanel extends JPanel {
 
         if (glass != null) glass.setVisible(true);
 
-        storyText.setText("<html><div style='text-align:center'>" + nextText.replace("\n", "<br>") + "</div></html>");
+        //Typewriter Effect
+        storyText.setText("");
+        storyContinue.setVisible(false);
+        typeText(nextText);
 
-        //Typewriter Effect, not ready
-        //storyNext.setText("");
-        //typetext(nextText);
 
         storyOverlay.setBounds(0, 0, getWidth(), getHeight());
         storyOverlay.setVisible(true);
@@ -1077,33 +1085,37 @@ public class BattlePanel extends JPanel {
     //Effects parts to be transed later
 
     //With how StoryCont() is structed storyText bounces up and down. Until i find a fix this remains commented :(
-    // private void startBlinking() {
-    //     Timer t = new Timer(500, e -> {
-    //         storyContinue.setVisible(!storyContinue.isVisible());
-    //     });
-    //     t.start();
-    // }
+    private void startBlinking() {
+        Timer t = new Timer(500, e -> {
+            storyContinue.setVisible(!storyContinue.isVisible());
+        });
+        t.start();
+    }
 
     //Typewriter eff,  still need minor fixes in storyOverlay so no jumpy effs
     //TODO: Test setPreferredsize() on overlay, u never know ;)
-    // private void typeText(String fullText) {
-    //     String cleaned = "<html><div style='text-align:center'>" +
-    //         fullText.replace("\n", "<br>") + "</div></html>";
+    private void typeText(String fullText) {
+        String header = "<html><div style='text-align:center'>";
+        String footer = "</div></html>";
+        String inner = fullText.replace("\n", "<br>");
 
-    //     final StringBuilder current = new StringBuilder();
-    //     final char[] chars = cleaned.toCharArray();
+        final char[] chars = inner.toCharArray();
+        final StringBuilder current = new StringBuilder();
 
-    //     Timer typeTimer = new Timer(10, null);
-    //     typeTimer.addActionListener(e -> {
-    //         if (current.length() < chars.length) {
-    //             current.append(chars[current.length()]);
-    //             storyText.setText(current.toString());
-    //         } else {
-    //             typeTimer.stop();
-    //         }
-    //     });
-    //     typeTimer.start();
-    // }
+        Timer typeTimer = new Timer(20, null);
+        typeTimer.addActionListener(e -> {
+            if (current.length() < chars.length) {
+                current.append(chars[current.length()]);
+                // Only update the INNER text, not the wrapper
+                storyText.setText(header + current + footer);
+            } else {
+                typeTimer.stop();
+                storyContinue.setVisible(true);
+            }
+        });
+        typeTimer.start();
+    }
+
 
 
     private Image backgroundImage;
